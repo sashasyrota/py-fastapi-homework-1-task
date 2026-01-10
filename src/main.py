@@ -1,12 +1,11 @@
 from contextlib import asynccontextmanager
-from urllib.request import Request
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from starlette.responses import JSONResponse
 
 from src.database import init_db, close_db
 from src.routes import movie_router
-from src.routes.movies import InvalidValueError
+from src.routes.crud import InvalidValueError
 
 
 @asynccontextmanager
@@ -28,8 +27,8 @@ async def validation_exception_handler(request: Request, exc: InvalidValueError)
         detail=[
             {
                 "loc": ["query", exc.name],
-                "msg": "Input should be greater than or equal to 1",
-                "type": "value_error.number.not_ge",
+                "msg": exc.description,
+                "type": f"value_error.number.{exc.type_error}",
             }
         ],
     )

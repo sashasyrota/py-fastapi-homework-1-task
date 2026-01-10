@@ -1,35 +1,59 @@
-from sqlalchemy import select
+import math
+
+from fastapi import HTTPException
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import MovieModel
-from src.schemas.movies import MovieCreateSchema
+
+
+class InvalidValueError(Exception):
+    def __init__(self, name, description, type_error):
+        self.name = name
+        self.description = description
+        self.type_error = type_error
+
+
+def get_page_url(page: int, per_page: int):
+    return f"/theater/movies/?page={page}&per_page={per_page}"
 
 
 async def get_movies(db: AsyncSession, page: int, per_page: int):
-    stmt = select(MovieModel)
-    result = await db.execute(stmt)
-    result = result.scalars().all()
-    return result
+    stmt_select_movies = select(MovieModel).offset((page - 1) * per_page).limit(per_page)
+    movies = await db.execute(stmt_select_movies)
+    movies = movies.scalars().all()
+    if not 1 <= per_page <= 20:
+        raise InvalidValueError(
+            name="per_page",
+            description="Input should be greater than or equal to 1 "
+                        "and less or equal to 20",
+            type_error="not_ge or not_le"
+        )
+    if page < 1:
+        raise InvalidValueError(
+            name="page",
+            description="Input should be greater than or equal to 1",
+            type_error="not_ge"
+        )
+    if not movies:
+        raise HTTPException(detail="No movies found.", status_code=404)
+    stmt_count_movies = select(func.count()).select_from(MovieModel)
+    total_items = await db.scalar(stmt_count_movies)
+    total_pages = math.ceil(total_items / per_page)
+    prev_page_url = None
+    if page > 1:
+        prev_page_url = get_page_url(page=page - 1, per_page=per_page)
+    next_page_url = None
+    if page + 1 <= total_pages:
+        next_page_url = get_page_url(page=page + 1, per_page=per_page)
 
-
-async def create_movie(movie_schema: MovieCreateSchema, db: AsyncSession):
-    movie_db = MovieModel(
-        name=movie_schema.name,
-        date=movie_schema.date,
-        score=movie_schema.score,
-        genre=movie_schema.genre,
-        overview=movie_schema.overview,
-        crew=movie_schema.crew,
-        orig_title=movie_schema.orig_title,
-        status=movie_schema.status,
-        orig_lang=movie_schema.orig_lang,
-        budget=movie_schema.budget,
-        revenue=movie_schema.revenue,
-        country=movie_schema.country,
-    )
-    db.add(movie_db)
-    await db.commit()
-    return movie_db
+    return {
+        "movies": movies,
+        "prev_page": prev_page_url,
+        "next_page": next_page_url,
+        "total_pages": total_pages,
+        "total_items": total_items,
+    }
 
 
 async def get_movie(movie_id: int, db: AsyncSession):

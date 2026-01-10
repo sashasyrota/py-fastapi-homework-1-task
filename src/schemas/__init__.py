@@ -1,3 +1,1 @@
-from .movies import MovieListResponseSchema
-
-# MovieDetailResponseSchema,
+from .movies import MovieListResponseSchema, MovieDetailResponseSchema
