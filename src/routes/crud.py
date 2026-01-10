@@ -19,9 +19,6 @@ def get_page_url(page: int, per_page: int):
 
 
 async def get_movies(db: AsyncSession, page: int, per_page: int):
-    stmt_select_movies = select(MovieModel).offset((page - 1) * per_page).limit(per_page)
-    movies = await db.execute(stmt_select_movies)
-    movies = movies.scalars().all()
     if not 1 <= per_page <= 20:
         raise InvalidValueError(
             name="per_page",
@@ -35,6 +32,9 @@ async def get_movies(db: AsyncSession, page: int, per_page: int):
             description="Input should be greater than or equal to 1",
             type_error="not_ge"
         )
+    stmt_select_movies = select(MovieModel).offset((page - 1) * per_page).limit(per_page)
+    movies = await db.execute(stmt_select_movies)
+    movies = movies.scalars().all()
     if not movies:
         raise HTTPException(detail="No movies found.", status_code=404)
     stmt_count_movies = select(func.count()).select_from(MovieModel)
